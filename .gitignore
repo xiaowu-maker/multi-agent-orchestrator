@@ -1,0 +1,15 @@
+# 项目产出
+output/
+plan.md
+progress.yaml
+escalation.md
+requirements.md
+
+# 项目配置（由用户自己维护）
+.claude/orchestrator/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+*.pyc
+__pycache__/

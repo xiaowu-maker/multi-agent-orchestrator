@@ -1,0 +1,54 @@
+# AI比赛实验预设
+name: "AI比赛实验流程"
+description: "分析 → 实验 → 评估，适合AI比赛中的方案探索和迭代"
+version: "1.0"
+
+roles:
+  analyst:
+    description: "分析比赛数据和基线方案，制定实验计划"
+    prompt: "~/.claude/templates/multi-agent/prompts/planner.md"
+    lifecycle: once
+    paired_with: []
+    max_retries: 0
+    veto_power: false
+
+  experimenter:
+    description: "实现实验方案，训练模型或运行算法"
+    prompt: "~/.claude/templates/multi-agent/prompts/developer.md"
+    lifecycle: persistent
+    paired_with: [evaluator]
+    max_retries: 5
+    veto_power: false
+
+  evaluator:
+    description: "评估实验结果，对比基线指标"
+    prompt: "~/.claude/templates/multi-agent/prompts/tester.md"
+    lifecycle: persistent
+    paired_with: []
+    max_retries: 0
+    veto_power: false
+
+workflow:
+  checkpoints:
+    - after: init
+    - after: all_tasks
+    - on: escalation
+
+  init:
+    - role: analyst
+      count: 1
+
+  per_task:
+    - role: experimenter
+      count: 1
+    - role: evaluator
+      count: 1
+
+  finalize: []
+
+  task_strategy: serial
+
+  # AI比赛特殊说明：
+  # - experimenter的max_retries更高(5次)，因为实验需要反复调参
+  # - evaluator的评估标准来自analyst产出的计划文档
+  # - 每个实验任务对应一个方案变体或一组超参数
