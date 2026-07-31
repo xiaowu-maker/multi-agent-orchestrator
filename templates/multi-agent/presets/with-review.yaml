@@ -8,6 +8,7 @@ roles:
     description: "分析需求，制定开发计划，拆解任务"
     prompt: "~/.claude/templates/multi-agent/prompts/planner.md"
     lifecycle: once
+    model: sonnet
     paired_with: []
     max_retries: 0
     veto_power: false
@@ -16,6 +17,7 @@ roles:
     description: "编写代码实现功能"
     prompt: "~/.claude/templates/multi-agent/prompts/developer.md"
     lifecycle: persistent
+    model: sonnet
     paired_with: [tester, reviewer]
     max_retries: 3
     veto_power: false
@@ -24,6 +26,7 @@ roles:
     description: "验证功能是否满足验收条件"
     prompt: "~/.claude/templates/multi-agent/prompts/tester.md"
     lifecycle: persistent
+    model: sonnet
     paired_with: []
     max_retries: 0
     veto_power: false
@@ -32,6 +35,7 @@ roles:
     description: "审查代码质量、可维护性和安全性"
     prompt: "~/.claude/templates/multi-agent/prompts/reviewer.md"
     lifecycle: persistent
+    model: sonnet
     paired_with: []
     max_retries: 0
     veto_power: true

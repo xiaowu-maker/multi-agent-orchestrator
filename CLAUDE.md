@@ -21,8 +21,9 @@
 ## 编排流程
 
 ### 阶段1：计划
+- 读取 `roles.yaml` 中 planner 的 `model` 配置
 - 读取 `~/.claude/templates/multi-agent/prompts/planner.md`
-- Agent工具创建 `planner`，传入需求文档路径
+- Agent工具创建 `planner`，传入需求文档路径，model 参数用 roles.yaml 中指定的值
 - 等返回 plan.md → **暂停展示计划给用户确认**
 
 ### 阶段2：读取工作流配置
@@ -38,6 +39,7 @@ FOR EACH 任务:
   FOR EACH stage in workflow.per_task（按顺序）:
     从 roles.yaml 读取该角色的配置:
       - prompt: 模板路径
+      - model: 使用的模型 (sonnet|opus|haiku|fable|best|default|deepseek-v4-flash 等, 不填用默认)
       - lifecycle: once | persistent
       - paired_with: [角色列表] 或空
       - max_retries: 最大重试次数
@@ -45,16 +47,16 @@ FOR EACH 任务:
     读取该角色的 prompt 模板文件
 
     如果 paired_with 为空:
-      → Agent工具创建该角色
+      → Agent工具创建该角色，model 参数用 roles.yaml 中指定的值
       → 等待返回
       → 如果是 persistent，记录名称到 agent_names
 
     如果 paired_with 不为空:
       → 该角色是"生产者"
-      → Agent工具创建该生产者
+      → Agent工具创建该生产者，model 参数用 roles.yaml 中指定的值
       → 等待返回产出路径
       → 然后对 paired_with 中的每个配对角色:
-          → Agent工具创建配对角色（审查者）
+          → Agent工具创建配对角色（审查者），model 参数用 roles.yaml 中指定的值
           → 等待返回审查报告
           → 读取报告状态:
               PASSED → 下一个配对角色

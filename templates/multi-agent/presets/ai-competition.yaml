@@ -8,6 +8,7 @@ roles:
     description: "分析比赛数据和基线方案，制定实验计划"
     prompt: "~/.claude/templates/multi-agent/prompts/planner.md"
     lifecycle: once
+    model: sonnet
     paired_with: []
     max_retries: 0
     veto_power: false
@@ -16,6 +17,7 @@ roles:
     description: "实现实验方案，训练模型或运行算法"
     prompt: "~/.claude/templates/multi-agent/prompts/developer.md"
     lifecycle: persistent
+    model: sonnet
     paired_with: [evaluator]
     max_retries: 5
     veto_power: false
@@ -24,6 +26,7 @@ roles:
     description: "评估实验结果，对比基线指标"
     prompt: "~/.claude/templates/multi-agent/prompts/tester.md"
     lifecycle: persistent
+    model: sonnet
     paired_with: []
     max_retries: 0
     veto_power: false

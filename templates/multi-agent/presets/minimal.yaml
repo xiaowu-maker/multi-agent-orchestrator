@@ -8,6 +8,7 @@ roles:
     description: "编写代码实现功能"
     prompt: "~/.claude/templates/multi-agent/prompts/developer.md"
     lifecycle: persistent
+    model: sonnet
     paired_with: [tester]
     max_retries: 3
     veto_power: false
@@ -16,6 +17,7 @@ roles:
     description: "验证代码是否满足验收条件"
     prompt: "~/.claude/templates/multi-agent/prompts/tester.md"
     lifecycle: persistent
+    model: sonnet
     paired_with: []
     max_retries: 0
     veto_power: false
