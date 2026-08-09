@@ -1,52 +1,41 @@
 # 标准开发流程预设
 name: "标准开发流程"
 description: "计划 → 开发 → 测试，适合有需求文档的常规开发任务"
-version: "1.0"
 
+# model 说明：
+#   - 留空 "" = 用当前默认模型（Hermes 子代理继承主模型）
+#   - Claude Code 环境可填 sonnet / haiku / opus 等
+#   - 建议：developer 用强模型，tester 用便宜模型
 roles:
   planner:
     description: "分析需求，制定开发计划，拆解任务"
-    prompt: "~/.claude/templates/multi-agent/prompts/planner.md"
-    lifecycle: once
-    model: sonnet
+    prompt: "prompts/planner.md"
+    model: ""
     paired_with: []
     max_retries: 0
     veto_power: false
 
   developer:
     description: "编写代码实现功能"
-    prompt: "~/.claude/templates/multi-agent/prompts/developer.md"
-    lifecycle: persistent
-    model: sonnet
+    prompt: "prompts/developer.md"
+    model: ""
     paired_with: [tester]
     max_retries: 3
     veto_power: false
 
   tester:
     description: "验证代码是否满足验收条件"
-    prompt: "~/.claude/templates/multi-agent/prompts/tester.md"
-    lifecycle: persistent
-    model: sonnet
+    prompt: "prompts/tester.md"
+    model: ""
     paired_with: []
     max_retries: 0
     veto_power: false
 
 workflow:
-  checkpoints:
-    - after: init
-    - after: all_tasks
-    - on: escalation
-
   init:
     - role: planner
-      count: 1
-
   per_task:
     - role: developer
-      count: 1
     - role: tester
-      count: 1
-
   finalize: []
-
-  task_strategy: serial
+  task_strategy: serial   # serial = 按依赖顺序串行 | parallel = 无依赖任务并行

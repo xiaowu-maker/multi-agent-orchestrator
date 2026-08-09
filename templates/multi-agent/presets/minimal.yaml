@@ -1,51 +1,39 @@
 # 极简流程预设
 name: "极简流程"
 description: "开发 → 测试，无计划阶段。适合需求已经很明确的小任务"
-version: "1.0"
 
 roles:
   developer:
     description: "编写代码实现功能"
-    prompt: "~/.claude/templates/multi-agent/prompts/developer.md"
-    lifecycle: persistent
-    model: sonnet
+    prompt: "prompts/developer.md"
+    model: ""
     paired_with: [tester]
     max_retries: 3
     veto_power: false
 
   tester:
     description: "验证代码是否满足验收条件"
-    prompt: "~/.claude/templates/multi-agent/prompts/tester.md"
-    lifecycle: persistent
-    model: sonnet
+    prompt: "prompts/tester.md"
+    model: ""
     paired_with: []
     max_retries: 0
     veto_power: false
 
 workflow:
-  checkpoints:
-    - after: all_tasks
-    - on: escalation
-
   init: []
-
   per_task:
     - role: developer
-      count: 1
     - role: tester
-      count: 1
-
   finalize: []
-
   task_strategy: serial
 
-  # 极简模式说明：任务列表由用户直接在 requirements.md 中列出
-  # requirements.md 格式示例：
-  # ---
-  # tasks:
-  #   - id: 1
-  #     name: "任务名"
-  #     description: "做什么"
-  #     acceptance_criteria:
-  #       - "验收条件1"
-  # ---
+# 极简模式说明：任务列表由用户直接在 requirements.md 中列出
+# requirements.md 格式示例：
+# ---
+# tasks:
+#   - id: 1
+#     name: "任务名"
+#     description: "做什么"
+#     acceptance_criteria:
+#       - "验收条件1"
+# ---
