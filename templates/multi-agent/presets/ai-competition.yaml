@@ -35,6 +35,7 @@ workflow:
     - role: evaluator
   finalize: []
   task_strategy: serial
+  max_parallel: 3         # 并行上限（task_strategy=parallel 时生效，默认3）
 
 # AI比赛特殊说明：
 # - experimenter的max_retries更高(5次)，因为实验需要反复调参

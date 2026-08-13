@@ -39,3 +39,4 @@ workflow:
     - role: tester
   finalize: []
   task_strategy: serial   # serial = 按依赖顺序串行 | parallel = 无依赖任务并行
+  max_parallel: 3         # 并行上限（task_strategy=parallel 时生效，默认3）

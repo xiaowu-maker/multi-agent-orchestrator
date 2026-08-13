@@ -44,3 +44,4 @@ workflow:
     - role: reviewer
   finalize: []
   task_strategy: serial
+  max_parallel: 3         # 并行上限（task_strategy=parallel 时生效，默认3）

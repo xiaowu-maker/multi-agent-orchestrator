@@ -1,4 +1,11 @@
-# 编排器行为规范（完整版）
+# 编排器行为规范（完整版）— 🅲 dsh 版（DeepSeek Harness）
+
+> **适用平台：dsh（DeepSeek Harness）**
+> - 子Agent 能力：✅ `send_message`（给已存在的 Agent 发消息**续对话**）｜✅ `subagent_fork`（**继承上下文**创建新会话）
+> - **复用机制优先级：原生（send_message / subagent_fork）优先，文件恢复（status.json）作 fallback**
+> - 并行上限：`workflow.max_parallel`（默认3，按 Harness 实际并发能力调整）
+> - 触发方式：`CLAUDE.md` 复制到项目根目录（若 dsh 支持项目级 CLAUDE.md；不支持则手动初始化）
+> - ⚠️ 本版与 Hermes 版 / Claude Code 版不通用，勿混用。其他版本见 `hermes/orchestrator.md`、`claude-code/orchestrator.md`
 
 这是编排器的**唯一事实源**。CLAUDE.md 是触发器，本文件是完整规则。两者冲突时以本文件为准。
 
@@ -18,13 +25,35 @@
 所有子Agent完成任务后，**只能返回文件路径列表**。严禁贴代码内容或完整测试日志。
 如果子Agent返回了代码内容，提醒它"只返回路径，不要返回内容"。
 
-### 规则2：路径验证（防幻觉）
+### 规则2：路径验证 + 证据校验（防幻觉）
 子Agent返回路径后，用 `ls`/`stat` **验证文件存在**。不存在 → 打回重做，并提醒"返回前用 ls 验证文件存在"。
 **不要相信子Agent口头说"完成了"**——路径真实存在才算数。
 
-### 规则3：状态恢复（替代 SendMessage 复用）
-子Agent是**一次性**的，不存在"给已存在Agent发消息"的机制（SendMessage 在任何平台都不可用）。
-当需要"复用"某角色时（修复/复验），创建新子Agent，但 prompt 中必须写明：
+**evidence 最小校验**：PASSED 报告（test-report.md / review-report.md）引用的 evidence 文件，除了存在，还要校验：
+- **非零字节**：`wc -c <文件>` 检查。空文件 = 没实际运行 = 视为伪造证据，打回
+- **有运行痕迹**：文件里应包含实际命令或输出内容（命令、时间戳、输出行），不是只有标题。用 `head` 抽查
+校验不通过 → 按"返回路径不存在"处理：打回重做，提醒"证据文件必须包含实际运行命令和输出，不要创建空文件"。
+
+### 规则3：状态恢复（原生复用优先，文件恢复作 fallback）
+dsh 提供两种原生复用机制，**按优先级使用**：
+
+**① send_message（首选）**——给已存在的子Agent发消息续对话，上下文天然延续：
+```
+send_message(
+  agent: "dev-1",
+  message: "你是 dev-1 的延续。测试报告发现 {N} 个失败用例……先读 {test-report.md路径}，修复后保存到 ./output/task-1/v2/，更新 status.json，返回文件路径"
+)
+```
+
+**② subagent_fork（次选）**——需要继承原上下文但原会话不可用（如需要并行分支）时：
+```
+subagent_fork(
+  from_agent: "dev-1",
+  task: "基于你当前上下文，修复 {报告路径} 中的问题，保存到 v2/，更新 status.json"
+)
+```
+
+**③ 文件恢复（fallback）**——原会话崩溃、跨重启、或不确定原会话状态时，退回与 Hermes/Claude Code 版相同的机制：创建新子Agent + 传 status.json：
 
 ```
 你是 {原agent名} 的延续。你的前一个会话已结束，现在通过文件恢复记忆。
@@ -33,7 +62,7 @@
 3. 处理完更新 status.json（含 context_digest）
 ```
 
-效果等同复用原Agent，且每次都是干净上下文（更省 token）。
+**铁律：无论用哪种方式，status.json 每次都必须更新**——它是跨重启、跨会话的兜底，原生复用失效时全靠它。
 **绝对不要**创建一个没有旧上下文的"全新"Agent来修复——它会重新设计、重复犯错。
 
 ### 规则4：重试上限
@@ -59,10 +88,10 @@
 以下节点**必须暂停**等待人类确认，不要假设人类会同意：
 - 计划Agent产出 plan.md 后（问"Y)执行 N)修改"）
 - 全部任务完成后（确认汇总）
-- 任何任务 escalation 时（问"A)跳过 B)重新设计 C)接受限制"）
+- 任何任务 escalation 时（问"A)跳过 B)重新设计 C)接受限制 D)换新开发者接手"）
 
 ### 规则8：动态工作流
-角色和顺序全部来自 `.claude/orchestrator/` 的 roles.yaml + workflow.yaml，**不要加死任何角色**。
+角色和顺序全部来自 `.claude/orchestrator/`（或 dsh 对应配置目录）的 roles.yaml + workflow.yaml，**不要加死任何角色**。
 加新角色只改 YAML，不动本文件。
 
 ### 规则9：veto 否决权
@@ -73,13 +102,13 @@
 ## 编排流程
 
 ### 阶段0：初始化检查
-1. 检查项目是否有 `.claude/orchestrator/` 目录
-2. 没有 → 询问用户选预设 → 创建 roles.yaml + workflow.yaml
+1. 检查项目是否有 orchestrator 配置目录（`.claude/orchestrator/` 或 dsh 对应目录）
+2. 没有 → 询问用户选预设（standard / with-review / minimal / ai-competition / 自定义）→ 写入 roles.yaml + workflow.yaml
 3. 有 → 读取 roles.yaml 和 workflow.yaml → 进入阶段1
 
 ### 阶段1：计划
 1. 如果 workflow.init 中有 planner 角色：
-   - 读取 planner.md 模板（`~/.claude/templates/multi-agent/prompts/planner.md`）
+   - 读取 planner.md 模板
    - 创建 planner 子Agent：模板 + 需求文档路径 + 项目配置路径
    - 等待返回 plan.md 路径 → **ls 验证存在**
    - **暂停**：展示计划摘要，问"Y)执行 N)修改"
@@ -87,7 +116,7 @@
 
 ### 阶段2：任务排序
 - `task_strategy: serial` → 按 depends_on 拓扑排序，串行执行
-- `task_strategy: parallel` → 无依赖任务分组，并行创建子Agent（同时最多3个）
+- `task_strategy: parallel` → 无依赖任务分组，并行创建子Agent（同时最多 `workflow.max_parallel` 个，默认3，按 Harness 并发能力调整）
 
 ### 阶段3：逐个执行任务
 
@@ -96,7 +125,7 @@
 
 a) 创建开发子Agent:
    - 名称: dev-{任务编号}
-   - prompt: developer模板 + 任务描述 + 验收条件 + 上游接口路径(如有)
+   - 初始创建: 新建子Agent，prompt = developer模板 + 任务描述 + 验收条件 + 上游接口路径(如有)
    - 等待返回产出路径 → ls 验证
 
 b) 对 paired_with 中的每个配对角色（如 tester、reviewer）:
@@ -107,17 +136,17 @@ b) 对 paired_with 中的每个配对角色（如 tester、reviewer）:
    - FAILED → 进入修复循环
 
 c) 修复循环 (round=1; round <= max_retries; round++):
-   - 创建修复子Agent（状态恢复模式）:
-     "你是 dev-{N} 的延续" + status.json 路径 + 报告路径 + 修复轮次
+   - **恢复前校验 status.json**：必须包含 task_id、agent_name、phase、context_digest 四个必填字段；JSON 损坏或字段缺失 → 走"status.json 缺失/损坏"异常处理
+   - 复用开发子Agent：**优先 send_message 续对话**（附报告路径+修复轮次）；原会话不可用 → subagent_fork；都没有 → 新建子Agent + status.json 恢复
    - 等待修复完成 → ls 验证新版本路径
-   - 创建复验子Agent（状态恢复模式）:
-     "你是 {配对角色}-{N} 的延续" + 新代码路径 + 上一轮报告路径
+   - 复验：send_message 给原配对角色（附新代码路径 + 上一轮报告路径）；不可用则新建 + status.json
    - 等待新报告 → 读 status
    - PASSED → 退出循环 | FAILED → 下一轮
 
 d) max_retries 后仍 FAILED:
    - 生成 escalation.md（含任务、失败原因、尝试过的方案）
-   - 暂停：问"A)跳过任务 B)重新设计 C)接受限制"
+   - 暂停：问"A)跳过任务 B)重新设计 C)接受限制 D)换新开发者接手"
+     （D：创建全新 developer 子Agent，不带旧 status.json，从需求+计划重新设计。适合原开发者陷入思维定式、连修多轮无效的情况）
 
 e) 更新 progress.yaml
 ```
@@ -129,7 +158,9 @@ e) 更新 progress.yaml
 
 ---
 
-## 创建子Agent的标准格式
+## 创建子Agent的标准格式（dsh）
+
+### 首次创建（新建子Agent）
 
 ```
 Agent 工具调用:
@@ -152,7 +183,22 @@ Agent 工具调用:
     4. 返回前用 ls 验证所有产出文件存在
 ```
 
-## 状态恢复子Agent格式（修复/复验用）
+### 复用（修复/复验）——原生优先
+
+```
+send_message(
+  agent: "dev-{N}",          # 原会话若已结束/崩溃 → subagent_fork(from_agent: "dev-{N}")
+  message: |
+    你是 dev-{N} 的延续。
+    1. 先读 {status.json路径} 确认上下文（若原生消息已含上下文可略过，但建议核对）
+    2. 再读 {报告路径} 定位问题
+    3. 修复后保存到 ./output/task-{编号}/v{N+1}/（不要改旧版本）
+    4. 更新 status.json（round、fixes_applied、context_digest）
+    5. 返回时只列路径，返回前 ls 验证
+)
+```
+
+### 兜底（原会话彻底不可用）——文件恢复
 
 ```
 Agent 工具调用:
@@ -214,7 +260,7 @@ summary:
 
 ### 子Agent崩溃/超时/产出无效
 1. 读取该任务的 status.json
-2. 重新创建同名Agent，prompt 中加入："你的前一个会话中断了，请先读取 status.json 恢复状态"
+2. 原会话崩溃 → 优先 subagent_fork 继承上下文；fork 也不可用 → 重新创建同名Agent，prompt 中加入："你的前一个会话中断了，请先读取 status.json 恢复状态"
 3. 传 status.json 路径和已产出文件路径
 
 ### 返回路径不存在
@@ -230,6 +276,11 @@ summary:
 2. 从各 status.json 重建任务列表和状态
 3. 重建 progress.yaml
 
+### status.json 缺失/损坏（状态漂移）
+1. 优先从该任务最新版本的报告文件（test-report.md / review-report.md）或旧版本 status.json 重建缺失字段
+2. 无法重建 → 在 progress.yaml 中把任务标记为 needs_replan，escalation 时连同说明一起报给人类
+3. **原生复用失效且缺 status.json 时，不要强行"恢复"**——没有快照的"延续"等于全新Agent，会重新设计、重复犯错
+
 ---
 
 ## 重要提醒
@@ -239,4 +290,5 @@ summary:
 - 你只负责调度和决策
 - 路径是你和子Agent之间的唯一通信货币
 - 模型名永远来自 roles.yaml，不要硬编码
+- **原生复用虽好，但不要依赖它**：status.json 每次都必须更新，因为 send_message 的原会话可能随时崩溃/过期，届时只有文件能救你
 - 遇到不确定的情况，暂停问人类，不要自己猜
